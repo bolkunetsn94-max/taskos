@@ -147,6 +147,18 @@ input[type=date].in,input[type=time].in{color-scheme:dark;min-height:46px}
 .sw.on{background:rgba(0,229,255,.2);border-color:var(--cyan)}
 .sw.on:after{left:21px;background:var(--cyan);box-shadow:0 0 10px var(--cyan)}
 .small{font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.6;margin-top:10px}
+.tpls{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;margin-bottom:12px}
+.tpl{flex:none;padding:8px 11px;border:1px dashed var(--line2);border-radius:10px;font-size:13px;background:var(--bg2);white-space:nowrap}
+.tpl:hover,.tpl:active{border-color:var(--mag);color:#fff}
+.tpl small{color:var(--muted);font-family:var(--mono);font-size:10px;margin-left:6px}
+.tpl.add{border-style:solid;color:var(--cyan);font-family:var(--mono);font-size:12px}
+.trow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.trow .tx{flex:1;min-width:0;cursor:pointer}
+.trow .tx b{display:block;font-weight:500;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trow .tx span{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.trow button{width:34px;height:34px;flex:none;border-radius:9px;display:grid;place-items:center;color:var(--muted);border:1px solid var(--line)}
+.trow button:hover{color:var(--red);border-color:rgba(255,59,92,.4)}
+.trow button svg{width:15px;height:15px}
 
 /* alarm */
 .alarm{position:fixed;inset:0;z-index:60;display:none;place-items:center;background:rgba(2,4,8,.82);backdrop-filter:blur(6px);padding:20px}
@@ -207,6 +219,7 @@ input[type=date].in,input[type=time].in{color-scheme:dark;min-height:46px}
 <div class="sheet" id="sheet">
   <div class="grab"></div>
   <h3 id="sheetTitle">// НОВАЯ ЗАДАЧА</h3>
+  <div id="tplWrap"><label class="f" style="margin-top:0">★ ИЗ ШАБЛОНА</label><div class="tpls" id="tpls"></div></div>
   <form id="form">
     <input class="in" id="fTitle" placeholder="Что нужно сделать?" required maxlength="140">
     <label class="f">ДАТА И ВРЕМЯ</label>
@@ -236,6 +249,7 @@ input[type=date].in,input[type=time].in{color-scheme:dark;min-height:46px}
       <button type="button" class="btn" id="fCancel">Отмена</button>
       <button type="submit" class="btn pri">Сохранить</button>
     </div>
+    <button type="button" class="btn" id="fSaveTpl" style="width:100%;margin-top:10px">★ Сохранить как шаблон</button>
   </form>
 </div>
 
@@ -246,11 +260,21 @@ input[type=date].in,input[type=time].in{color-scheme:dark;min-height:46px}
   <div class="set"><div>Системные уведомления<small id="notifState">—</small></div><button class="sw" id="swNotif"></button></div>
   <div class="set"><div>Звук напоминания<small>Сигнал, когда приложение открыто</small></div><button class="sw" id="swSound"></button></div>
   <div class="set"><div>Экспорт в Календарь (.ics)<small>Все активные задачи с напоминаниями — сработают на iPhone даже офлайн</small></div><button class="iconbtn" id="icsAll">⇩</button></div>
+  <div class="set"><div>Шаблоны задач<small>Повторяющиеся задачи — выбирать из списка, а не писать заново</small></div><button class="iconbtn" id="openTpl">★</button></div>
   <div class="set"><div>Резервная копия<small>Скопировать данные в буфер (JSON)</small></div><button class="iconbtn" id="backup">⧉</button></div>
   <div class="set"><div>Восстановить<small>Вставить JSON из резервной копии</small></div><button class="iconbtn" id="restoreBtn">↺</button></div>
   <textarea class="in" id="restoreTxt" placeholder="Вставь сюда JSON и нажми ↺ ещё раз" style="display:none;margin-top:10px;min-height:90px;font-family:var(--mono);font-size:11px"></textarea>
   <div class="small">Данные хранятся только на этом устройстве (localStorage). Напоминания внутри приложения срабатывают, пока оно открыто. Для гарантированных уведомлений на iPhone — экспорт задачи в Календарь (иконка календаря у задачи).</div>
   <div class="btns"><button class="btn" id="setClose">Закрыть</button></div>
+</div>
+
+<!-- templates sheet -->
+<div class="sheet" id="tplSheet">
+  <div class="grab"></div>
+  <h3>// ШАБЛОНЫ</h3>
+  <div id="tplList"></div>
+  <div class="small">Тап по шаблону — изменить. Новый шаблон можно сделать здесь или из любой задачи кнопкой «★ Сохранить как шаблон».</div>
+  <div class="btns"><button class="btn pri" id="tplNew">+ Новый шаблон</button><button class="btn" id="tplClose">Закрыть</button></div>
 </div>
 
 <!-- alarm -->
@@ -278,6 +302,12 @@ const MON = ['января','февраля','марта','апреля','мая
 const REM_LABEL = {'-1':'','0':'в срок','10':'за 10м','30':'за 30м','60':'за 1ч','1440':'за 1д'};
 const REP_LABEL = {none:'',daily:'ежедн.',weekdays:'будни',weekly:'еженед.'};
 const PRI_W = {high:0,med:1,low:2};
+const DEFAULT_TPL = [
+  {title:'Тренировка',time:'19:00',remind:30,repeat:'weekdays',pri:'high',tag:'спорт',note:''},
+  {title:'Утренняя зарядка',time:'07:30',remind:0,repeat:'daily',pri:'med',tag:'спорт',note:''},
+  {title:'Проверить хронометраж к старту',time:'10:00',remind:60,repeat:'none',pri:'high',tag:'работа',note:''},
+  {title:'План на неделю',time:'20:00',remind:0,repeat:'weekly',pri:'med',tag:'личное',note:''}
+];
 
 const ICON = {
   check:'<svg viewBox="0 0 24 24" fill="none" stroke="#001218" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>',
@@ -288,9 +318,9 @@ const ICON = {
 };
 
 /* ---------- storage ---------- */
-let state = {tasks:[], settings:{notif:false, sound:true}};
+let state = {tasks:[], templates:null, settings:{notif:false, sound:true}};
 function load(){
-  try{ const raw = localStorage.getItem(KEY); if(raw){ const d = JSON.parse(raw); if(d && Array.isArray(d.tasks)) state = {tasks:d.tasks, settings:Object.assign({notif:false,sound:true}, d.settings||{})}; } }catch(e){}
+  try{ const raw = localStorage.getItem(KEY); if(raw){ const d = JSON.parse(raw); if(d && Array.isArray(d.tasks)) state = {tasks:d.tasks, templates:Array.isArray(d.templates)?d.templates:null, settings:Object.assign({notif:false,sound:true}, d.settings||{})}; } }catch(e){}
 }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){ toast('⚠ хранилище недоступно'); } }
 
@@ -449,10 +479,12 @@ function segSet(el, v){ el.querySelectorAll('button').forEach(b => b.classList.t
 function segGet(el){ const b = el.querySelector('button.on'); return b ? b.dataset.v : null; }
 ['#fRem','#fRep','#fPri'].forEach(s => $(s).addEventListener('click', e => { const b = e.target.closest('button'); if(b) segSet($(s), b.dataset.v); }));
 
-function openSheet(id){
-  editingId = id || null;
-  const t = id ? state.tasks.find(x=>x.id===id) : null;
-  $('#sheetTitle').textContent = t ? '// РЕДАКТИРОВАНИЕ' : '// НОВАЯ ЗАДАЧА';
+function openSheet(id, opt){
+  opt = opt || {};
+  tplMode = !!opt.tpl; editingTplId = (opt.tpl && opt.tpl!=='new') ? opt.tpl : null;
+  editingId = tplMode ? null : (id || null);
+  const t = tplMode ? (editingTplId ? state.templates.find(x=>x.id===editingTplId) : null) : (id ? state.tasks.find(x=>x.id===id) : null);
+  $('#sheetTitle').textContent = tplMode ? (t ? '// ИЗМЕНИТЬ ШАБЛОН' : '// НОВЫЙ ШАБЛОН') : (t ? '// РЕДАКТИРОВАНИЕ' : '// НОВАЯ ЗАДАЧА');
   $('#fTitle').value = t?.title || '';
   $('#fDate').value = t ? (t.date||'') : (selDay || (view==='inbox' ? '' : todayStr()));
   $('#fTime').value = t?.time || '';
@@ -461,7 +493,11 @@ function openSheet(id){
   segSet($('#fPri'), t?.pri || 'med');
   $('#fTag').value = t?.tag || '';
   $('#fNote').value = t?.note || '';
-  $('#fDel').style.display = t ? '' : 'none';
+  $('#fDel').style.display = (t && !tplMode) ? '' : 'none';
+  $('#fDate').style.display = tplMode ? 'none' : '';
+  $('#fSaveTpl').style.display = tplMode ? 'none' : '';
+  $('#tplWrap').style.display = (tplMode || t) ? 'none' : '';
+  if(!tplMode && !t) renderTplChips();
   $('#tagList').innerHTML = [...new Set(state.tasks.map(x=>x.tag).filter(Boolean))].map(x=>`<option value="${esc(x)}">`).join('');
   show('#sheet');
   if(!t) setTimeout(()=>$('#fTitle').focus(), 260);
@@ -469,14 +505,18 @@ function openSheet(id){
 function show(sel){ $('#veil').classList.add('on'); $(sel).classList.add('on'); }
 function hideAll(){ $('#veil').classList.remove('on'); document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('on')); $('#restoreTxt').style.display='none'; }
 
-$('#form').addEventListener('submit', e => {
-  e.preventDefault();
-  const title = $('#fTitle').value.trim(); if(!title) return;
-  const data = {
+function readForm(){
+  const title = $('#fTitle').value.trim(); if(!title){ $('#fTitle').focus(); return null; }
+  return {
     title, date:$('#fDate').value || null, time:$('#fTime').value || null,
     remind:Number(segGet($('#fRem')) ?? -1), repeat:segGet($('#fRep'))||'none', pri:segGet($('#fPri'))||'med',
     tag:$('#fTag').value.trim().replace(/^#/,''), note:$('#fNote').value.trim()
   };
+}
+$('#form').addEventListener('submit', e => {
+  e.preventDefault();
+  const data = readForm(); if(!data) return;
+  if(tplMode){ if(saveTemplate(data, editingTplId)){ hideAll(); openTplSheet(); } return; }
   if(data.repeat!=='none' && !data.date) data.date = todayStr();
   if(editingId){
     const t = state.tasks.find(x=>x.id===editingId);
@@ -493,6 +533,55 @@ $('#fCancel').onclick = hideAll;
 $('#fDel').onclick = () => { const id = editingId; hideAll(); del(id); };
 $('#veil').onclick = hideAll;
 $('#add').onclick = () => openSheet();
+
+/* ---------- templates ---------- */
+let tplMode = false, editingTplId = null;
+function tplMeta(p){ return [p.time, (p.repeat && p.repeat!=='none') ? REP_LABEL[p.repeat] : '', p.tag ? '#'+p.tag : ''].filter(Boolean).join(' · '); }
+function renderTplChips(){
+  const list = state.templates || [];
+  $('#tpls').innerHTML = list.map(p => `<button type="button" class="tpl" data-t="${p.id}">${esc(p.title)}${p.time?`<small>${p.time}</small>`:''}</button>`).join('')
+    + `<button type="button" class="tpl add" data-t="manage">★ ${list.length?'список':'добавить'}</button>`;
+}
+function applyTpl(p){
+  $('#fTitle').value = p.title; $('#fTime').value = p.time || '';
+  segSet($('#fRem'), p.remind ?? -1); segSet($('#fRep'), p.repeat || 'none'); segSet($('#fPri'), p.pri || 'med');
+  $('#fTag').value = p.tag || ''; $('#fNote').value = p.note || '';
+  if(!$('#fDate').value) $('#fDate').value = selDay || todayStr();
+}
+function saveTemplate(d, id){
+  const p = {title:d.title, time:d.time, remind:d.remind, repeat:d.repeat, pri:d.pri, tag:d.tag, note:d.note};
+  if(id){ const ex = state.templates.find(x=>x.id===id); if(ex) Object.assign(ex, p); }
+  else {
+    if(state.templates.some(x => x.title.toLowerCase()===p.title.toLowerCase() && (x.time||'')===(p.time||''))){ toast('Такой шаблон уже есть'); return false; }
+    state.templates.push(Object.assign({id:uid()}, p));
+  }
+  save(); toast(id ? '★ шаблон обновлён' : '★ шаблон сохранён'); return true;
+}
+function renderTplList(){
+  const list = state.templates || [];
+  $('#tplList').innerHTML = list.length
+    ? list.map(p => `<div class="trow" data-t="${p.id}"><div class="tx" data-a="edit"><b>${esc(p.title)}</b><span>${esc(tplMeta(p)) || 'без времени'}</span></div><button data-a="del" title="Удалить">${ICON.del}</button></div>`).join('')
+    : '<div class="empty" style="margin:20px 0"><b>∅</b>Шаблонов пока нет</div>';
+}
+function openTplSheet(){ renderTplList(); show('#tplSheet'); }
+$('#tpls').addEventListener('click', e => {
+  const b = e.target.closest('.tpl'); if(!b) return;
+  if(b.dataset.t==='manage'){ hideAll(); openTplSheet(); return; }
+  const p = state.templates.find(x=>x.id===b.dataset.t); if(p) applyTpl(p);
+});
+$('#tplList').addEventListener('click', e => {
+  const a = e.target.closest('[data-a]'); if(!a) return;
+  const id = a.closest('.trow').dataset.t;
+  if(a.dataset.a==='del'){
+    const i = state.templates.findIndex(x=>x.id===id); if(i<0) return;
+    const [r] = state.templates.splice(i,1); save(); renderTplList();
+    toastUndo('Шаблон удалён', () => { state.templates.splice(i,0,r); save(); renderTplList(); });
+  } else { hideAll(); openSheet(null, {tpl:id}); }
+});
+$('#fSaveTpl').onclick = () => { const d = readForm(); if(d && saveTemplate(d)) renderTplChips(); };
+$('#openTpl').onclick = () => { hideAll(); openTplSheet(); };
+$('#tplNew').onclick = () => { hideAll(); openSheet(null, {tpl:'new'}); };
+$('#tplClose').onclick = hideAll;
 
 /* ---------- list events ---------- */
 $('#list').addEventListener('click', e => {
@@ -645,7 +734,7 @@ $('#restoreBtn').onclick = () => {
   if(ta.style.display==='none'){ ta.style.display=''; ta.focus(); return; }
   try{
     const d = JSON.parse(ta.value); if(!Array.isArray(d.tasks)) throw 0;
-    state = {tasks:d.tasks, settings:Object.assign({notif:false,sound:true}, d.settings||{})}; save(); hideAll(); render(); toast('↺ данные восстановлены');
+    state = {tasks:d.tasks, templates:Array.isArray(d.templates)?d.templates:state.templates, settings:Object.assign({notif:false,sound:true}, d.settings||{})}; save(); hideAll(); render(); toast('↺ данные восстановлены');
   }catch(e){ toast('⚠ неверный JSON'); }
 };
 
@@ -687,6 +776,7 @@ window.addEventListener('online', tick); window.addEventListener('offline', tick
 
 /* ---------- boot ---------- */
 load();
+if(!Array.isArray(state.templates)){ state.templates = DEFAULT_TPL.map(p => Object.assign({id:uid()}, p)); save(); }
 if(IS_IOS && !IS_STANDALONE){
   let seen = false; try{ seen = localStorage.getItem('taskos.installHint')==='1'; }catch(e){}
   if(!seen) setTimeout(() => {

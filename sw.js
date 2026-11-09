@@ -1,5 +1,5 @@
 /* TASK//OS service worker — офлайн-кэш приложения */
-const VERSION = 'taskos-v1.0.0';
+const VERSION = 'taskos-v1.1.0';
 const SHELL = [
   './',
   './index.html',
