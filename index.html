@@ -159,6 +159,11 @@ input[type=date].in,input[type=time].in{color-scheme:dark;min-height:46px}
 .trow button{width:34px;height:34px;flex:none;border-radius:9px;display:grid;place-items:center;color:var(--muted);border:1px solid var(--line)}
 .trow button:hover{color:var(--red);border-color:rgba(255,59,92,.4)}
 .trow button svg{width:15px;height:15px}
+.lcat{margin:18px 0 2px;display:flex;align-items:center;justify-content:space-between;font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--mag)}
+.lcat button{font-size:11px;color:var(--cyan);letter-spacing:.06em;padding:5px 9px;border:1px solid var(--line);border-radius:8px}
+.trow button.add{color:var(--cyan);font-size:18px}
+.trow button.add:hover{color:#001218;background:var(--cyan);border-color:var(--cyan)}
+.trow button.added{color:var(--lime);border-color:rgba(182,255,59,.35);cursor:default}
 
 /* alarm */
 .alarm{position:fixed;inset:0;z-index:60;display:none;place-items:center;background:rgba(2,4,8,.82);backdrop-filter:blur(6px);padding:20px}
@@ -233,7 +238,7 @@ input[type=date].in,input[type=time].in{color-scheme:dark;min-height:46px}
     <label class="f">ПОВТОР</label>
     <div class="seg" id="fRep">
       <button type="button" data-v="none">нет</button><button type="button" data-v="daily">ежедневно</button>
-      <button type="button" data-v="weekdays">будни</button><button type="button" data-v="weekly">еженед.</button>
+      <button type="button" data-v="weekdays">будни</button><button type="button" data-v="weekly">еженед.</button><button type="button" data-v="monthly">ежемес.</button>
     </div>
     <label class="f">ПРИОРИТЕТ</label>
     <div class="seg pri" id="fPri">
@@ -274,7 +279,17 @@ input[type=date].in,input[type=time].in{color-scheme:dark;min-height:46px}
   <h3>// ШАБЛОНЫ</h3>
   <div id="tplList"></div>
   <div class="small">Тап по шаблону — изменить. Новый шаблон можно сделать здесь или из любой задачи кнопкой «★ Сохранить как шаблон».</div>
+  <button class="btn" id="openLib" style="width:100%;margin-top:14px;border-color:var(--mag);color:#fff">📚 Библиотека шаблонов</button>
   <div class="btns"><button class="btn pri" id="tplNew">+ Новый шаблон</button><button class="btn" id="tplClose">Закрыть</button></div>
+</div>
+
+<!-- library sheet -->
+<div class="sheet" id="libSheet">
+  <div class="grab"></div>
+  <h3>// БИБЛИОТЕКА ШАБЛОНОВ</h3>
+  <div class="small" style="margin-top:0">Типовые повторяющиеся задачи из популярных планеров и трекеров привычек. «+» добавляет в твои шаблоны, время и повтор потом можно поменять.</div>
+  <div id="libList"></div>
+  <div class="btns"><button class="btn" id="libBack">← Мои шаблоны</button></div>
 </div>
 
 <!-- alarm -->
@@ -300,13 +315,66 @@ const KEY = 'taskos.v1';
 const DOW = ['ВС','ПН','ВТ','СР','ЧТ','ПТ','СБ'];
 const MON = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
 const REM_LABEL = {'-1':'','0':'в срок','10':'за 10м','30':'за 30м','60':'за 1ч','1440':'за 1д'};
-const REP_LABEL = {none:'',daily:'ежедн.',weekdays:'будни',weekly:'еженед.'};
+const REP_LABEL = {none:'',daily:'ежедн.',weekdays:'будни',weekly:'еженед.',monthly:'ежемес.'};
 const PRI_W = {high:0,med:1,low:2};
 const DEFAULT_TPL = [
   {title:'Тренировка',time:'19:00',remind:30,repeat:'weekdays',pri:'high',tag:'спорт',note:''},
   {title:'Утренняя зарядка',time:'07:30',remind:0,repeat:'daily',pri:'med',tag:'спорт',note:''},
   {title:'Проверить хронометраж к старту',time:'10:00',remind:60,repeat:'none',pri:'high',tag:'работа',note:''},
   {title:'План на неделю',time:'20:00',remind:0,repeat:'weekly',pri:'med',tag:'личное',note:''}
+];
+// [название, время, повтор, напомнить за (мин), приоритет, тег]
+const TPL_LIBRARY = [
+  ['СПОРТ И ЗДОРОВЬЕ', [
+    ['Тренировка','19:00','weekdays',30,'high','спорт'],
+    ['Утренняя зарядка','07:30','daily',0,'med','спорт'],
+    ['Пробежка','07:00','weekly',15,'med','спорт'],
+    ['Растяжка / мобилити 15 минут','21:00','daily',0,'low','спорт'],
+    ['Выпить 2 л воды','12:00','daily',0,'low','здоровье'],
+    ['Витамины','09:00','daily',0,'low','здоровье'],
+    ['Подготовка ко сну, без экрана','22:30','daily',0,'med','здоровье'],
+    ['Взвешивание и замеры','08:00','weekly',0,'low','здоровье']
+  ]],
+  ['РАБОТА', [
+    ['Разобрать почту и мессенджеры','09:00','weekdays',0,'med','работа'],
+    ['Выбрать 3 главные задачи дня','09:30','weekdays',0,'high','работа'],
+    ['Планёрка / созвон','10:00','weekdays',10,'med','работа'],
+    ['Итоги недели и отчёт','17:00','weekly',30,'med','работа'],
+    ['Проверить хронометраж к старту','10:00','none',60,'high','работа'],
+    ['Отчёт за месяц','11:00','monthly',1440,'high','работа']
+  ]],
+  ['ПЛАНИРОВАНИЕ', [
+    ['План на неделю','20:00','weekly',0,'med','личное'],
+    ['Итоги дня: что сделано, что на завтра','21:30','daily',0,'low','личное'],
+    ['Разобрать входящие и заметки','18:00','weekly',0,'low','личное'],
+    ['Обзор целей месяца','20:00','monthly',0,'med','личное']
+  ]],
+  ['ДОМ', [
+    ['Уборка','11:00','weekly',0,'med','дом'],
+    ['Стирка','10:00','weekly',0,'low','дом'],
+    ['Закупка продуктов','18:30','weekly',0,'med','дом'],
+    ['Вынести мусор','08:00','none',0,'low','дом'],
+    ['Полить цветы','10:00','weekly',0,'low','дом'],
+    ['Сменить постельное бельё','10:00','weekly',0,'low','дом'],
+    ['Помыть холодильник, ревизия продуктов','11:00','monthly',0,'low','дом']
+  ]],
+  ['ФИНАНСЫ', [
+    ['Оплатить коммуналку','10:00','monthly',1440,'high','финансы'],
+    ['Оплатить связь и подписки','10:00','monthly',60,'med','финансы'],
+    ['Внести расходы за неделю','20:00','weekly',0,'low','финансы'],
+    ['Отложить в накопления','12:00','monthly',0,'med','финансы'],
+    ['Обзор портфеля: акции и крипта','19:00','weekly',0,'med','финансы']
+  ]],
+  ['САМОРАЗВИТИЕ', [
+    ['Чтение 30 минут','22:00','daily',0,'low','развитие'],
+    ['Английский 15 минут','08:00','daily',0,'low','развитие'],
+    ['Медитация 10 минут','07:45','daily',0,'low','развитие'],
+    ['Дневник: 3 мысли за день','22:15','daily',0,'low','развитие']
+  ]],
+  ['БЛИЗКИЕ', [
+    ['Позвонить родителям','19:00','weekly',0,'med','семья'],
+    ['Время с семьёй и друзьями','18:00','weekly',0,'med','семья']
+  ]]
 ];
 
 const ICON = {
@@ -339,7 +407,8 @@ function fmtDate(s){
 function nextOccurrence(t){
   let d = parseYmd(t.date);
   do{
-    d = addDays(d, t.repeat==='weekly'?7:1);
+    if(t.repeat==='monthly'){ const day = parseYmd(t.date).getDate(); d = new Date(d.getFullYear(), d.getMonth()+1, 1); d.setDate(Math.min(day, new Date(d.getFullYear(), d.getMonth()+1, 0).getDate())); }
+    else d = addDays(d, t.repeat==='weekly'?7:1);
     if(t.repeat==='weekdays') while(d.getDay()===0||d.getDay()===6) d = addDays(d,1);
   } while(t.time && dueAt({date:ymd(d),time:t.time}) < new Date() && t.repeat!=='weekly' && false);
   return ymd(d);
@@ -578,6 +647,24 @@ $('#tplList').addEventListener('click', e => {
     toastUndo('Шаблон удалён', () => { state.templates.splice(i,0,r); save(); renderTplList(); });
   } else { hideAll(); openSheet(null, {tpl:id}); }
 });
+const libItem = a => ({title:a[0], time:a[1], repeat:a[2], remind:a[3], pri:a[4], tag:a[5], note:''});
+const hasTpl = title => state.templates.some(x => x.title.toLowerCase()===title.toLowerCase());
+function renderLib(){
+  $('#libList').innerHTML = TPL_LIBRARY.map(([cat, items], ci) =>
+    `<div class="lcat"><span>${cat}</span><button data-a="all" data-c="${ci}">+ все</button></div>` +
+    items.map((a, ii) => { const p = libItem(a), on = hasTpl(p.title);
+      return `<div class="trow"><div class="tx"><b>${esc(p.title)}</b><span>${esc(tplMeta(p))}</span></div><button class="${on?'added':'add'}" data-a="${on?'':'add'}" data-c="${ci}" data-i="${ii}" title="${on?'Уже в шаблонах':'Добавить'}">${on?'✓':'+'}</button></div>`; }).join('')
+  ).join('');
+}
+function addLib(a){ const p = libItem(a); if(hasTpl(p.title)) return 0; state.templates.push(Object.assign({id:uid()}, p)); return 1; }
+$('#libList').addEventListener('click', e => {
+  const b = e.target.closest('button[data-a]'); if(!b || !b.dataset.a) return;
+  const items = TPL_LIBRARY[+b.dataset.c][1]; let n = 0;
+  if(b.dataset.a==='all') items.forEach(a => { n += addLib(a); }); else n = addLib(items[+b.dataset.i]);
+  save(); renderLib(); toast(n ? `★ добавлено в шаблоны: ${n}` : 'Уже в шаблонах');
+});
+$('#openLib').onclick = () => { hideAll(); renderLib(); show('#libSheet'); };
+$('#libBack').onclick = () => { hideAll(); openTplSheet(); };
 $('#fSaveTpl').onclick = () => { const d = readForm(); if(d && saveTemplate(d)) renderTplChips(); };
 $('#openTpl').onclick = () => { hideAll(); openTplSheet(); };
 $('#tplNew').onclick = () => { hideAll(); openSheet(null, {tpl:'new'}); };
@@ -665,6 +752,7 @@ function buildIcs(tasks){
     if(t.tag) lines.push(`CATEGORIES:${icsEsc(t.tag)}`);
     if(t.repeat==='daily') lines.push('RRULE:FREQ=DAILY');
     if(t.repeat==='weekly') lines.push('RRULE:FREQ=WEEKLY');
+    if(t.repeat==='monthly') lines.push('RRULE:FREQ=MONTHLY');
     if(t.repeat==='weekdays') lines.push('RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR');
     if(t.remind>=0) lines.push('BEGIN:VALARM','ACTION:DISPLAY',`DESCRIPTION:${icsEsc(t.title)}`,`TRIGGER:-PT${t.remind}M`,'END:VALARM');
     lines.push('END:VEVENT');
